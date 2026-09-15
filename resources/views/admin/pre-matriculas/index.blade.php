@@ -24,6 +24,11 @@
                             Limpar
                         </a>
                     @endif
+                    <a href="{{ route('admin.pre-matriculas.exportar', request()->query()) }}"
+                       class="inline-flex items-center px-4 py-2 rounded-md border text-sm whitespace-nowrap"
+                       style="border-color: #0A5BA6; color: #0A5BA6;">
+                        Exportar CSV
+                    </a>
                 </div>
 
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-4 mt-1 border-t border-gray-100">

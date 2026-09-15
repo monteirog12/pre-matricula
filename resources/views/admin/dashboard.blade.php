@@ -42,8 +42,10 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div class="bg-white shadow-sm sm:rounded-lg p-5">
                     <p class="text-sm font-semibold text-gray-600 mb-3">Pré-matrículas por escola</p>
-                    <div style="position:relative;height:260px">
-                        <canvas id="chartEscolas"></canvas>
+                    <div style="max-height:340px; overflow-y:auto;">
+                        <div style="position:relative; height:{{ max(count($porEscola) * 36, 200) }}px">
+                            <canvas id="chartEscolas"></canvas>
+                        </div>
                     </div>
                 </div>
                 <div class="bg-white shadow-sm sm:rounded-lg p-5">
@@ -87,8 +89,9 @@
                 datasets: [{ data: Object.values(porEscola), backgroundColor: '#0A5BA6', borderRadius: 4 }]
             },
             options: {
+                indexAxis: 'y',
                 plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } },
+                scales: { x: { beginAtZero: true } },
                 responsive: true, maintainAspectRatio: false
             }
         });

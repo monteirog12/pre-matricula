@@ -6,13 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Models\Escola;
 use App\Models\PreMatricula;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PreMatriculaController extends Controller
 {
-    // Listagem com os filtros do painel: ano, escola, nivel, turno, status
-    public function index(Request $request)
+    private function anoLetivoAtivo(): int
     {
-        $anoLetivo = $request->input('ano_letivo', date('Y'));
+        return (int) (DB::table('configuracoes')->where('chave', 'ano_letivo_ativo')->value('valor') ?? date('Y'));
+    }
+
+    // Monta a query com todos os filtros da listagem - reaproveitada
+    // tanto na tela (index) quanto na exportacao (exportar), para
+    // garantir que o CSV exportado reflita exatamente o que esta
+    // sendo exibido na tela, com os mesmos filtros aplicados.
+    private function queryFiltrada(Request $request)
+    {
+        $anoLetivo = $request->input('ano_letivo', $this->anoLetivoAtivo());
 
         $query = PreMatricula::with(['aluno', 'escola'])
             ->where('ano_letivo', $anoLetivo);
@@ -45,10 +54,79 @@ class PreMatriculaController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $preMatriculas = $query->latest()->paginate(20)->withQueryString();
+        return $query;
+    }
+
+    // Listagem com os filtros do painel: ano, escola, nivel, turno, status
+    public function index(Request $request)
+    {
+        $anoLetivo = $request->input('ano_letivo', $this->anoLetivoAtivo());
+
+        $preMatriculas = $this->queryFiltrada($request)->latest()->paginate(20)->withQueryString();
         $escolas = Escola::orderBy('nome')->get();
 
         return view('admin.pre-matriculas.index', compact('preMatriculas', 'escolas', 'anoLetivo'));
+    }
+
+    // Exporta em CSV (abre direto no Excel) todas as pre-matriculas
+    // que batem com os filtros aplicados na tela - com os campos
+    // que a Secretaria precisa para redigitar no sistema interno.
+    public function exportar(Request $request)
+    {
+        $preMatriculas = $this->queryFiltrada($request)->latest()->get();
+
+        $nomeArquivo = 'pre-matriculas-' . $request->input('ano_letivo', $this->anoLetivoAtivo()) . '.csv';
+
+        return response()->streamDownload(function () use ($preMatriculas) {
+            $saida = fopen('php://output', 'w');
+
+            // BOM UTF-8, para o Excel exibir acentos corretamente
+            fwrite($saida, "\xEF\xBB\xBF");
+
+            fputcsv($saida, [
+                'Protocolo', 'Ano letivo', 'Status', 'Nome do aluno', 'Data de nascimento',
+                'Telefone', 'Endereço', 'RG', 'Naturalidade', 'UF', 'Nome do pai', 'Profissão do pai',
+                'Nome da mãe', 'Profissão da mãe', 'Necessidade especial', 'Descrição da necessidade',
+                'Escola', 'Zona', 'Nível de ensino', 'Turno', 'Situação', 'Série/ano anterior',
+                'Participa de programa federal', 'Qual programa', 'NIS', 'Observações', 'Data do cadastro',
+            ], ';');
+
+            foreach ($preMatriculas as $pm) {
+                fputcsv($saida, [
+                    $pm->protocolo,
+                    $pm->ano_letivo,
+                    $pm->status,
+                    $pm->aluno->nome,
+                    $pm->aluno->data_nascimento->format('d/m/Y'),
+                    $pm->aluno->telefone,
+                    $pm->aluno->endereco,
+                    $pm->aluno->rg,
+                    $pm->aluno->naturalidade,
+                    $pm->aluno->uf_naturalidade,
+                    $pm->aluno->nome_pai,
+                    $pm->aluno->profissao_pai,
+                    $pm->aluno->nome_mae,
+                    $pm->aluno->profissao_mae,
+                    $pm->aluno->possui_necessidade_especial ? 'Sim' : 'Não',
+                    $pm->aluno->descricao_necessidade,
+                    $pm->escola->nome,
+                    $pm->escola->zona,
+                    $pm->nivel_ensino,
+                    $pm->turno,
+                    $pm->situacao,
+                    $pm->serie_ano_anterior,
+                    $pm->participa_programa_federal ? 'Sim' : 'Não',
+                    $pm->qual_programa,
+                    $pm->nis,
+                    $pm->observacoes,
+                    $pm->created_at->format('d/m/Y H:i'),
+                ], ';');
+            }
+
+            fclose($saida);
+        }, $nomeArquivo, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     // Tela de detalhe: mostra TODOS os campos do aluno + dados escolares

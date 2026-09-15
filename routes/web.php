@@ -39,9 +39,10 @@ require __DIR__.'/auth.php';
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/pre-matriculas', [PreMatriculaController::class, 'index'])->name('pre-matriculas.index');
+    Route::get('/pre-matriculas/exportar', [PreMatriculaController::class, 'exportar'])->name('pre-matriculas.exportar');
     Route::get('/pre-matriculas/{preMatricula}', [PreMatriculaController::class, 'show'])->name('pre-matriculas.show');
     Route::put('/pre-matriculas/{preMatricula}', [PreMatriculaController::class, 'update'])->name('pre-matriculas.update');
-
+    
     // --- Somente Admin: gestao de usuarios ---
     Route::middleware('admin')->group(function () {
         Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
