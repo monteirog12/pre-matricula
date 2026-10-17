@@ -15,16 +15,28 @@ class PreMatriculaController extends Controller
         return (int) (DB::table('configuracoes')->where('chave', 'ano_letivo_ativo')->value('valor') ?? date('Y'));
     }
 
-    // Monta a query com todos os filtros da listagem - reaproveitada
-    // tanto na tela (index) quanto na exportacao (exportar), para
-    // garantir que o CSV exportado reflita exatamente o que esta
-    // sendo exibido na tela, com os mesmos filtros aplicados.
+    private function escolasPermitidas(): ?array
+    {
+        $usuario = auth()->user();
+
+        if ($usuario->perfil === 'Admin') {
+            return null;
+        }
+
+        return $usuario->escolas->pluck('id')->all();
+    }
+
     private function queryFiltrada(Request $request)
     {
         $anoLetivo = $request->input('ano_letivo', $this->anoLetivoAtivo());
 
         $query = PreMatricula::with(['aluno', 'escola'])
             ->where('ano_letivo', $anoLetivo);
+
+        $permitidas = $this->escolasPermitidas();
+        if ($permitidas !== null) {
+            $query->whereIn('escola_id', $permitidas ?: [0]);
+        }
 
         if ($request->filled('busca')) {
             $busca = $request->input('busca');
@@ -57,20 +69,20 @@ class PreMatriculaController extends Controller
         return $query;
     }
 
-    // Listagem com os filtros do painel: ano, escola, nivel, turno, status
     public function index(Request $request)
     {
         $anoLetivo = $request->input('ano_letivo', $this->anoLetivoAtivo());
 
         $preMatriculas = $this->queryFiltrada($request)->latest()->paginate(20)->withQueryString();
-        $escolas = Escola::orderBy('nome')->get();
+
+        $permitidas = $this->escolasPermitidas();
+        $escolas = $permitidas === null
+            ? Escola::orderBy('nome')->get()
+            : Escola::whereIn('id', $permitidas ?: [0])->orderBy('nome')->get();
 
         return view('admin.pre-matriculas.index', compact('preMatriculas', 'escolas', 'anoLetivo'));
     }
 
-    // Exporta em CSV (abre direto no Excel) todas as pre-matriculas
-    // que batem com os filtros aplicados na tela - com os campos
-    // que a Secretaria precisa para redigitar no sistema interno.
     public function exportar(Request $request)
     {
         $preMatriculas = $this->queryFiltrada($request)->latest()->get();
@@ -79,15 +91,13 @@ class PreMatriculaController extends Controller
 
         return response()->streamDownload(function () use ($preMatriculas) {
             $saida = fopen('php://output', 'w');
-
-            // BOM UTF-8, para o Excel exibir acentos corretamente
             fwrite($saida, "\xEF\xBB\xBF");
 
             fputcsv($saida, [
                 'Protocolo', 'Ano letivo', 'Status', 'Nome do aluno', 'Data de nascimento',
                 'Telefone', 'Endereço', 'RG', 'Naturalidade', 'UF', 'Nome do pai', 'Profissão do pai',
                 'Nome da mãe', 'Profissão da mãe', 'Necessidade especial', 'Descrição da necessidade',
-                'Escola', 'Zona', 'Nível de ensino', 'Turno', 'Situação', 'Série/ano anterior',
+                'Escola', 'Zona', 'Nível de ensino', 'Turno', 'Situação', 'Série que será matriculado',
                 'Participa de programa federal', 'Qual programa', 'NIS', 'Observações', 'Data do cadastro',
             ], ';');
 
@@ -129,27 +139,23 @@ class PreMatriculaController extends Controller
         ]);
     }
 
-    // Tela de detalhe: mostra TODOS os campos do aluno + dados escolares
-    // + o historico de alteracoes daquela pre-matricula.
     public function show(PreMatricula $preMatricula)
     {
+        abort_unless(auth()->user()->podeAcessarEscola($preMatricula->escola_id), 403);
+
         $preMatricula->load(['aluno', 'escola', 'historico.usuario']);
 
         return view('admin.pre-matriculas.show', compact('preMatricula'));
     }
 
-    // Atualiza dados do aluno e/ou da pre-matricula.
-    // O model PreMatricula ja registra automaticamente no historico
-    // (evento "updating") os campos auditados que mudarem.
     public function update(Request $request, PreMatricula $preMatricula)
     {
+        abort_unless(auth()->user()->podeAcessarEscola($preMatricula->escola_id), 403);
+
         $dados = $request->validate([
-            // dados do aluno (podem ser corrigidos pelo operador)
             'aluno.nome' => 'required|string|max:150',
             'aluno.telefone' => 'nullable|string|max:20',
             'aluno.endereco' => 'nullable|string|max:255',
-
-            // dados da pre-matricula
             'escola_id' => 'required|exists:escolas,id',
             'turno' => 'required|in:Matutino,Vespertino,Noturno',
             'situacao' => 'required|in:Promovido,Repetente',
@@ -157,9 +163,10 @@ class PreMatriculaController extends Controller
             'motivo' => 'nullable|string|max:255',
         ]);
 
-        // Regra de negocio: turno exclusivo por nivel de ensino
-        // (o nivel de ensino em si nao e editavel nesta tela).
+        abort_unless(auth()->user()->podeAcessarEscola($dados['escola_id']), 403);
+
         $turnosValidosPorNivel = [
+            'Creche'             => ['Matutino', 'Vespertino'],
             'Educacao Infantil'  => ['Matutino', 'Vespertino'],
             'Ensino Fundamental' => ['Matutino', 'Vespertino'],
             'EJA'                => ['Noturno'],
@@ -174,8 +181,6 @@ class PreMatriculaController extends Controller
         $aluno = $preMatricula->aluno;
         $aluno->fill($dados['aluno']);
 
-        // Audita as mudancas nos dados do aluno antes de salvar,
-        // usando o mesmo historico da pre-matricula em questao.
         foreach (['nome', 'telefone', 'endereco'] as $campo) {
             if ($aluno->isDirty($campo)) {
                 $preMatricula->historico()->create([

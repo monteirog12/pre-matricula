@@ -6,7 +6,7 @@
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center gap-2">
                     <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-2">
-                        <img src="{{ asset('images/logo-cafarnaum.png') }}" alt="Brasão de Cafarnaum" class="h-9 w-auto">
+                        <img src="{{ asset('images/logo-cafarnaum.png') }}" alt="Brasão de Cafarnaum" class="h-14 w-auto">
                         <span class="font-semibold" style="color: #06305E;">Pré-matrícula Escolar</span>
                     </a>
                 </div>
@@ -20,6 +20,9 @@
                         {{ __('Pré-matrículas') }}
                     </x-nav-link>
                     @if (Auth::user()->perfil === 'Admin')
+                        <x-nav-link :href="route('admin.escolas.index')" :active="request()->routeIs('admin.escolas.*')">
+                            {{ __('Escolas') }}
+                        </x-nav-link>
                         <x-nav-link :href="route('admin.usuarios.index')" :active="request()->routeIs('admin.usuarios.*')">
                             {{ __('Usuários') }}
                         </x-nav-link>
@@ -86,6 +89,9 @@
                 {{ __('Pré-matrículas') }}
             </x-responsive-nav-link>
             @if (Auth::user()->perfil === 'Admin')
+                <x-responsive-nav-link :href="route('admin.escolas.index')" :active="request()->routeIs('admin.escolas.*')">
+                    {{ __('Escolas') }}
+                </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.usuarios.index')" :active="request()->routeIs('admin.usuarios.*')">
                     {{ __('Usuários') }}
                 </x-responsive-nav-link>

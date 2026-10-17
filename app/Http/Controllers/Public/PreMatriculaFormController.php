@@ -16,8 +16,6 @@ class PreMatriculaFormController extends Controller
         return (int) (DB::table('configuracoes')->where('chave', 'ano_letivo_ativo')->value('valor') ?? date('Y'));
     }
 
-    // Etapa 1: so pede nome + data de nascimento, antes de mostrar o
-    // formulario inteiro. E aqui que decidimos Novo x Aluno da Casa.
     public function verificarForm()
     {
         return view('public.pre-matricula.verificar', [
@@ -34,7 +32,6 @@ class PreMatriculaFormController extends Controller
 
         $anoLetivo = $this->anoLetivoAtivo();
 
-        // 1) Ja existe pre-matricula desse aluno neste ano letivo?
         $jaMatriculado = PreMatricula::with(['aluno', 'escola'])
             ->where('ano_letivo', $anoLetivo)
             ->whereHas('aluno', function ($q) use ($dados) {
@@ -47,7 +44,6 @@ class PreMatriculaFormController extends Controller
             return view('public.pre-matricula.ja-matriculado', compact('jaMatriculado'));
         }
 
-        // 2) Existe cadastro de anos anteriores (aluno da casa)?
         $candidatos = Aluno::where('nome', $dados['nome'])
             ->where('data_nascimento', $dados['data_nascimento'])
             ->get();
@@ -60,8 +56,6 @@ class PreMatriculaFormController extends Controller
             ]);
         }
 
-        // 3) Nao encontrou nada: segue como aluno novo, ja com os
-        // 2 campos preenchidos levados adiante.
         return redirect()->route('pre-matricula.formulario', [
             'nome' => $dados['nome'],
             'data_nascimento' => $dados['data_nascimento'],
@@ -69,8 +63,6 @@ class PreMatriculaFormController extends Controller
         ]);
     }
 
-    // Formulario completo - aluno novo (em branco) ou aluno da casa
-    // confirmado (pre-preenchido, exceto dados escolares).
     public function create(Request $request)
     {
         $escolas = Escola::where('ativo', true)->orderBy('nome')->get();
@@ -107,7 +99,7 @@ class PreMatriculaFormController extends Controller
             'possui_necessidade_especial' => 'boolean',
             'descricao_necessidade'       => 'nullable|string',
             'escola_id'          => 'required|exists:escolas,id',
-            'nivel_ensino'       => 'required|in:Educacao Infantil,Ensino Fundamental,EJA',
+            'nivel_ensino'       => 'required|in:Creche,Educacao Infantil,Ensino Fundamental,EJA',
             'turno'              => 'required|in:Matutino,Vespertino,Noturno',
             'situacao'           => 'required|in:Promovido,Repetente',
             'serie_ano_anterior' => 'nullable|string|max:50',
@@ -119,6 +111,7 @@ class PreMatriculaFormController extends Controller
 
         // Regra de negocio: turno exclusivo por nivel de ensino.
         $turnosValidosPorNivel = [
+            'Creche'             => ['Matutino', 'Vespertino'],
             'Educacao Infantil'  => ['Matutino', 'Vespertino'],
             'Ensino Fundamental' => ['Matutino', 'Vespertino'],
             'EJA'                => ['Noturno'],
@@ -132,10 +125,6 @@ class PreMatriculaFormController extends Controller
 
         $anoLetivo = $this->anoLetivoAtivo();
 
-        // Trava de seguranca: mesmo que o aluno_id venha do formulario,
-        // confere de novo (no servidor) se ja nao existe pre-matricula
-        // pra esse aluno neste ano - evita duplicidade mesmo que o pai
-        // tenha aberto o formulario em duas abas, por exemplo.
         if (! empty($dados['aluno_id'])) {
             $existe = PreMatricula::where('aluno_id', $dados['aluno_id'])
                 ->where('ano_letivo', $anoLetivo)
@@ -148,8 +137,6 @@ class PreMatriculaFormController extends Controller
 
         $preMatricula = DB::transaction(function () use ($dados, $anoLetivo) {
             if (! empty($dados['aluno_id'])) {
-                // Aluno da casa: reaproveita o cadastro, atualizando so
-                // os dados que podem ter mudado de um ano pro outro.
                 $aluno = Aluno::findOrFail($dados['aluno_id']);
                 $aluno->update([
                     'telefone' => $dados['telefone'] ?? null,

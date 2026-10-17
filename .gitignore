@@ -1,4 +1,6 @@
 *.log
+*.sql
+*.zip
 .DS_Store
 .env
 .env.backup
@@ -13,6 +15,8 @@
 /.vscode
 /.zed
 /auth.json
+/config/database.php
+/config.php
 /node_modules
 /public/build
 /public/fonts-manifest.dev.json
@@ -21,6 +25,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+/uploads
 _ide_helper.php
 Homestead.json
 Homestead.yaml

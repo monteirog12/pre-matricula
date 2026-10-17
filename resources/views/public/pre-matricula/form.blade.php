@@ -51,7 +51,7 @@
             <input type="text" name="telefone" class="form-control" value="{{ old('telefone', $alunoConfirmado->telefone ?? '') }}">
         </div>
         <div class="col-md-4">
-            <label class="form-label">RG</label>
+            <label class="form-label">RG do Aluno</label>
             <input type="text" name="rg" class="form-control" value="{{ old('rg', $alunoConfirmado->rg ?? '') }}">
         </div>
         <div class="col-md-4">
@@ -95,7 +95,6 @@
         </div>
     </div>
 
-
     <h6 class="text-secondary mt-4">Dados escolares</h6>
     <div class="row g-3 mb-4">
         <div class="col-12">
@@ -112,6 +111,7 @@
         <div class="col-md-4">
             <label class="form-label">Nível de ensino</label>
             <select name="nivel_ensino" id="nivelEnsino" class="form-select" required>
+                <option value="Creche">Creche</option>
                 <option value="Educacao Infantil">Educação infantil</option>
                 <option value="Ensino Fundamental">Ensino fundamental</option>
                 <option value="EJA">EJA</option>
@@ -132,17 +132,17 @@
             </select>
         </div>
         <div class="col-md-6">
-            <label class="form-label">Série/ano anterior</label>
-            <input type="text" name="serie_ano_anterior" class="form-control" placeholder="ex.: 4º ano" value="{{ old('serie_ano_anterior') }}">
+            <label class="form-label">Série que será matriculado</label>
+            <input type="text" name="serie_ano_anterior" placeholder="ex.: 5º Ano" class="form-control" value="{{ old('serie_ano_anterior') }}">
         </div>
         <div class="col-md-6">
-            <label class="form-label">Participa de programa federal?</label>
-            <select name="participa_programa_federal" id="programaSelect" class="form-select">
+            <label class="form-label">Participa de programa federal</label>
+            <select name="participa_programa_federal" id="programaSelect" class="form-select" onchange="toggleProgramaCampo(this.value)">
                 <option value="0">Não</option>
                 <option value="1" {{ old('participa_programa_federal') ? 'selected' : '' }}>Sim</option>
             </select>
         </div>
-        <div class="col-md-6" id="programaDetalhe" style="display:none">
+        <div id="programaDetalhe" style="display:none">
             <label class="form-label">Qual programa</label>
             <input type="text" name="qual_programa" class="form-control" value="{{ old('qual_programa') }}">
         </div>
@@ -160,25 +160,37 @@
 </form>
 
 <script>
-document.getElementById('dataNascimento').addEventListener('input', function () {
-    if (!this.value) { document.getElementById('idadeCalculada').value = ''; return; }
-    const nasc = new Date(this.value), hoje = new Date();
+function calcIdade() {
+    const v = document.getElementById('dataNascimento').value;
+    if (!v) { document.getElementById('idadeCalculada').value = ''; return; }
+    const nasc = new Date(v + 'T00:00:00'), hoje = new Date();
     let idade = hoje.getFullYear() - nasc.getFullYear();
     const m = hoje.getMonth() - nasc.getMonth();
     if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
     document.getElementById('idadeCalculada').value = idade + ' anos';
-});
+}
+// Ouve tanto "input" quanto "change": alguns navegadores (principalmente
+// no celular, usando o seletor nativo de data) so disparam "change".
+document.getElementById('dataNascimento').addEventListener('input', calcIdade);
+document.getElementById('dataNascimento').addEventListener('change', calcIdade);
+calcIdade(); // calcula já ao carregar, caso o campo venha preenchido
 
+function toggleNecessidade(v) {
+    document.getElementById('necessidadeDetalhe').style.display = v === '1' ? 'block' : 'none';
+}
 document.getElementById('necessidadeSelect').addEventListener('change', function () {
-    document.getElementById('necessidadeDetalhe').style.display = this.value === '1' ? 'block' : 'none';
+    toggleNecessidade(this.value);
 });
+toggleNecessidade(document.getElementById('necessidadeSelect').value);
 
-document.getElementById('programaSelect').addEventListener('change', function () {
-    document.getElementById('programaDetalhe').style.display = this.value === '1' ? 'block' : 'none';
-});
+function toggleProgramaCampo(v) {
+    document.getElementById('programaDetalhe').style.display = v === '1' ? 'block' : 'none';
+}
+toggleProgramaCampo(document.getElementById('programaSelect').value);
 
 // Turno exclusivo por nível de ensino: EJA só tem Noturno;
-// Educação Infantil e Ensino Fundamental só têm Matutino/Vespertino.
+// os demais níveis (Creche, Educação Infantil, Ensino Fundamental)
+// só têm Matutino/Vespertino.
 document.getElementById('nivelEnsino').addEventListener('change', function () {
     const turno = document.getElementById('turnoSelect');
     turno.innerHTML = this.value === 'EJA'

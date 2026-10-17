@@ -18,9 +18,21 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     /**Nova function para mermitir apenas admin de acessar register */
-    public function escola()
+    /**public function escola()
     {
         return $this->belongsTo(\App\Models\Escola::class);
+    }*/
+    
+    /* Permitir um usuario do tipo operador acessar uma ou mais escolas definidas */
+    public function escolas()
+    {
+        return $this->belongsToMany(\App\Models\Escola::class, 'escola_usuario');
+    }
+
+    // Admin acessa tudo; Operador só as escolas vinculadas a ele.
+    public function podeAcessarEscola(int $escolaId): bool
+    {
+        return $this->perfil === 'Admin' || $this->escolas->contains('id', $escolaId);
     }
 
     /**

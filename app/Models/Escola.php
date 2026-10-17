@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Escola extends Model
@@ -14,5 +15,10 @@ class Escola extends Model
     public function preMatriculas(): HasMany
     {
         return $this->hasMany(PreMatricula::class);
+    }
+
+    public function usuarios(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'escola_usuario');
     }
 }

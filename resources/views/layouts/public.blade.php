@@ -30,7 +30,7 @@
 <body>
     <nav class="navbar navbar-light mb-4">
         <div class="container d-flex align-items-center gap-2">
-            <img src="{{ asset('images/logo-cafarnaum.png') }}" alt="Brasão de Cafarnaum" height="40">
+            <img src="{{ asset('images/logo-cafarnaum.png') }}" alt="Brasão de Cafarnaum" height="60">
             <span class="navbar-brand mb-0">Pré-matrícula Escolar</span>
         </div>
     </nav>

@@ -16,7 +16,16 @@ class DashboardController extends Controller
             DB::table('configuracoes')->where('chave', 'ano_letivo_ativo')->value('valor') ?? date('Y')
         );
 
-        $base = fn () => PreMatricula::where('ano_letivo', $anoLetivo);
+        $usuario = auth()->user();
+        $permitidas = $usuario->perfil === 'Admin' ? null : $usuario->escolas->pluck('id')->all();
+
+        $base = function () use ($anoLetivo, $permitidas) {
+            $q = PreMatricula::where('ano_letivo', $anoLetivo);
+            if ($permitidas !== null) {
+                $q->whereIn('escola_id', $permitidas ?: [0]);
+            }
+            return $q;
+        };
 
         $total = $base()->count();
 
